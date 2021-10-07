@@ -12,13 +12,36 @@ using namespace Imagine;
 using namespace std;
 
 // Record clicks in two images, until right button click
+
 void getClicks(Window w1, Window w2,
                vector<IntPoint2>& pts1, vector<IntPoint2>& pts2) {
     // ------------- TODO/A completer ----------
 
+       cout << "Select pairs of points in both images"<< endl;
+       int button = 0;
+
+       int sub_window=0;
+       IntPoint2 dot;
+       Window window;
+
+
+       int dot_radius = 10;
+       Color dot_col = Color(0,0,255);
+
+       while(button!=3){
+           button = anyGetMouse(dot, window, sub_window);
+           setActiveWindow(window);
+           drawCircle(dot, dot_radius, dot_col);
+           if(window == w1){
+               pts1.push_back(dot);
+           }
+           else if(window == w2){
+               pts2.push_back(dot);
+           };
+       }
+       cout << "Processing..." << endl;
 
 }
-
 // Return homography compatible with point matches
 Matrix<float> getHomography(const vector<IntPoint2>& pts1,
                             const vector<IntPoint2>& pts2) {
@@ -30,6 +53,31 @@ Matrix<float> getHomography(const vector<IntPoint2>& pts1,
     Matrix<double> A(2*n,8);
     Vector<double> B(2*n);
     // ------------- TODO/A completer ----------
+
+
+    for(int i = 0; i<n;i++){
+            // Fill the matrix A
+            A(2*i,0) = pts1[i].x();
+            A(2*i+1,0) = 0;
+            A(2*i,1) = pts1[i].y();
+            A(2*i+1,1) = 0;
+            A(2*i,2) = 1;
+            A(2*i+1,2) = 0;
+            A(2*i,3) = 0;
+            A(2*i+1,3) = pts1[i].x();
+            A(2*i,4) = 0;
+            A(2*i+1,4) = pts1[i].y();
+            A(2*i,5) = 0;
+            A(2*i+1,5) = 1;
+            A(2*i,6) = -(pts2[i].x()*pts1[i].x());
+            A(2*i+1,6) = -(pts2[i].y()*pts1[i].x());
+            A(2*i,7) = -(pts2[i].x()*pts1[i].y());
+            A(2*i+1,7) = -(pts2[i].y()*pts1[i].y());
+
+            // Fill the Vector B
+            B[2*i] = pts2[i].x();
+            B[2*i+1] = pts2[i].y();
+        }
 
     B = linSolve(A, B);
     Matrix<float> H(3, 3);
@@ -82,18 +130,54 @@ void panorama(const Image<Color,2>& I1, const Image<Color,2>& I2,
     growTo(x0, y0, x1, y1, v[0], v[1]);
 
     cout << "x0 x1 y0 y1=" << x0 << ' ' << x1 << ' ' << y0 << ' ' << y1<<endl;
-
+    int padding = 600;
     Image<Color> I(int(x1-x0), int(y1-y0));
     setActiveWindow( openWindow(I.width(), I.height()) );
     I.fill(WHITE);
     // ------------- TODO/A completer ----------
+    Matrix<float> Hm1 = inverse(H);
+    Vector<float> dot(3);
+
+        // Iterate over the pixels of the new image
+    for(int i=0; i< I.width(); i++){
+        for(int j=0; j<I.height(); j++){
+            dot[0] = i+x0;
+            dot[1] = j+y0;
+            dot[2] = 1;
+            // Compute New coordinates using Homography
+            Vector<float> new_dot;
+            new_dot = Hm1*dot;
+            new_dot = new_dot/new_dot[2];// Remain in the same 3D plan.
+
+            if(dot[0] > 0 && dot[1]>0 && dot[0]<I2.width() && dot[1]<I2.height()){
+                if (new_dot[0] > 0 && new_dot[1]>0 && new_dot[0]<I1.width() && new_dot[1]<I1.height()) {
+
+                    I(i, j)[0]=(I2(dot[0], dot[1])[0] + I1.interpolate(new_dot[0], new_dot[1])[0]) * 0.5;
+                    I(i, j)[1]=(I2(dot[0], dot[1])[1] + I1.interpolate(new_dot[0], new_dot[1])[1]) * 0.5;
+                    I(i, j)[2]=(I2(dot[0], dot[1])[2] + I1.interpolate(new_dot[0], new_dot[1])[2]) * 0.5;
+                }
+                else{
+                        I(i, j) = I2(dot[0], dot[1]);
+                    }
+                }
+                else if(new_dot[0] > 0 && new_dot[1]>0 && new_dot[0]<I1.width() && new_dot[1]<I1.height()){
+                    I(i, j) = I1.interpolate(new_dot[0], new_dot[1]);
+                }
+
+            }
+        }
+
+
     display(I,0,0);
 }
 
 // Main function
 int main(int argc, char* argv[]) {
-    const char* s1 = argc>1? argv[1]: srcPath("image0006.jpg");
-    const char* s2 = argc>2? argv[2]: srcPath("image0007.jpg");
+    //const char* s1 = argc>1? argv[1]: srcPath("image0006.jpg");
+    //const char* s2 = argc>2? argv[2]: srcPath("image0007.jpg");
+    const char* s1 = argc>1? argv[1]: srcPath("1.jpg");
+    const char* s2 = argc>2? argv[2]: srcPath("2.jpg");
+
 
     // Load and display images
     Image<Color> I1, I2;
@@ -123,10 +207,10 @@ int main(int argc, char* argv[]) {
     // Compute homography
     Matrix<float> H = getHomography(pts1, pts2);
     cout << "H=" << H/H(2,2);
-
+    cout << "computed homography";
     // Apply homography
     panorama(I1, I2, H);
-
+    cout << "computed panorama";
     endGraphics();
     return 0;
 }
