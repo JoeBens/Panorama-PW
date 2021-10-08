@@ -26,10 +26,11 @@ void getClicks(Window w1, Window w2,
 
 
        int dot_radius = 10;
-       Color dot_col = Color(0,0,255);
+       Color dot_col = Color(0,255,0);
+       button = anyGetMouse(dot, window, sub_window);
 
        while(button!=3){
-           button = anyGetMouse(dot, window, sub_window);
+
            setActiveWindow(window);
            drawCircle(dot, dot_radius, dot_col);
            if(window == w1){
@@ -38,6 +39,7 @@ void getClicks(Window w1, Window w2,
            else if(window == w2){
                pts2.push_back(dot);
            };
+           button = anyGetMouse(dot, window, sub_window);
        }
        cout << "Processing..." << endl;
 
@@ -55,7 +57,7 @@ Matrix<float> getHomography(const vector<IntPoint2>& pts1,
     // ------------- TODO/A completer ----------
 
 
-    for(int i = 0; i<n;i++){
+    for(int i = 0; i<(int)n;i++){
             // Fill the matrix A
             A(2*i,0) = pts1[i].x();
             A(2*i+1,0) = 0;
@@ -73,6 +75,7 @@ Matrix<float> getHomography(const vector<IntPoint2>& pts1,
             A(2*i+1,6) = -(pts2[i].y()*pts1[i].x());
             A(2*i,7) = -(pts2[i].x()*pts1[i].y());
             A(2*i+1,7) = -(pts2[i].y()*pts1[i].y());
+
 
             // Fill the Vector B
             B[2*i] = pts2[i].x();
@@ -107,6 +110,15 @@ void growTo(float& x0, float& y0, float& x1, float& y1, float x, float y) {
     if(y>y1) y1=y;    
 }
 
+Color meanColor(const Color& j,const Color& k) {
+    /*if (j[0] + j[1] + j[2] < 20)
+        return k;
+    if (k[0] + k[1] + k[2] < 20)
+        return j;
+    */
+    return Color((j[0] + k[0]) / 2, (j[1] + k[1]) / 2, (j[2] + k[2]) / 2);
+
+}
 // Panorama construction
 void panorama(const Image<Color,2>& I1, const Image<Color,2>& I2,
               Matrix<float> H) {
@@ -130,43 +142,35 @@ void panorama(const Image<Color,2>& I1, const Image<Color,2>& I2,
     growTo(x0, y0, x1, y1, v[0], v[1]);
 
     cout << "x0 x1 y0 y1=" << x0 << ' ' << x1 << ' ' << y0 << ' ' << y1<<endl;
-    int padding = 600;
     Image<Color> I(int(x1-x0), int(y1-y0));
     setActiveWindow( openWindow(I.width(), I.height()) );
     I.fill(WHITE);
-    // ------------- TODO/A completer ----------
-    Matrix<float> Hm1 = inverse(H);
-    Vector<float> dot(3);
+    // ------------- TODO/A completer --------
 
-        // Iterate over the pixels of the new image
-    for(int i=0; i< I.width(); i++){
-        for(int j=0; j<I.height(); j++){
-            dot[0] = i+x0;
-            dot[1] = j+y0;
-            dot[2] = 1;
-            // Compute New coordinates using Homography
-            Vector<float> new_dot;
-            new_dot = Hm1*dot;
-            new_dot = new_dot/new_dot[2];// Remain in the same 3D plan.
 
-            if(dot[0] > 0 && dot[1]>0 && dot[0]<I2.width() && dot[1]<I2.height()){
-                if (new_dot[0] > 0 && new_dot[1]>0 && new_dot[0]<I1.width() && new_dot[1]<I1.height()) {
-
-                    I(i, j)[0]=(I2(dot[0], dot[1])[0] + I1.interpolate(new_dot[0], new_dot[1])[0]) * 0.5;
-                    I(i, j)[1]=(I2(dot[0], dot[1])[1] + I1.interpolate(new_dot[0], new_dot[1])[1]) * 0.5;
-                    I(i, j)[2]=(I2(dot[0], dot[1])[2] + I1.interpolate(new_dot[0], new_dot[1])[2]) * 0.5;
-                }
-                else{
-                        I(i, j) = I2(dot[0], dot[1]);
+    for (int i = 0; i < I.width(); i++) {
+            for (int j = 0; j < I.height(); j++) {
+                v[0]=i+x0;
+                v[1]=j+y0;
+                if(v[0]>0 && v[1]>0 && v[0]<I2.width() && v[1]<I2.height()){
+                    I(i,j)=I2(v[0],v[1]);
+                    continue;
                     }
-                }
-                else if(new_dot[0] > 0 && new_dot[1]>0 && new_dot[0]<I1.width() && new_dot[1]<I1.height()){
-                    I(i, j) = I1.interpolate(new_dot[0], new_dot[1]);
+                v=inverse(H)*v;
+                v/=v[2];
+                if(v[0]>0 && v[1]>0 && v[0]<I1.width() && v[1]<I2.height()){
+                    if(I(i,j)==WHITE)
+                        I(i,j)=I1.interpolate(v[0],v[1]);
+                    else
+                    {
+                        auto e= I1.interpolate(v[0],v[1]);
+                        I(i,j)= meanColor(I(i,j),e);
+                    }
+
                 }
 
             }
         }
-
 
     display(I,0,0);
 }
@@ -207,7 +211,7 @@ int main(int argc, char* argv[]) {
     // Compute homography
     Matrix<float> H = getHomography(pts1, pts2);
     cout << "H=" << H/H(2,2);
-    cout << "computed homography";
+    cout << "computed homography"<<endl;
     // Apply homography
     panorama(I1, I2, H);
     cout << "computed panorama";
