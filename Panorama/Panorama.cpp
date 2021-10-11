@@ -17,19 +17,17 @@ void getClicks(Window w1, Window w2,
                vector<IntPoint2>& pts1, vector<IntPoint2>& pts2) {
     // ------------- TODO/A completer ----------
 
-       cout << "Select pairs of points in both images"<< endl;
+       cout << "Choose 4 or more pairs of points in the two images : "<< endl;
        int button = 0;
 
        int sub_window=0;
        IntPoint2 point;
        Window window;
-
-
        int point_Radius = 5;
        Color point_Color = Color(0,0,255);
        button = anyGetMouse(point, window, sub_window);
 
-        // button 3 is for right click
+
        while(button!=3){
 
            setActiveWindow(window);
@@ -59,6 +57,7 @@ Matrix<float> getHomography(const vector<IntPoint2>& pts1,
 
 
     for(int i = 0; i<(int)n;i++){
+
         // Fill A
         // x1 y1 1 0 0 0 -x1'x1 -x1'y1
         // 0 0 0 x1 y1 1 -y'1x1 -y1'y1
@@ -86,7 +85,7 @@ Matrix<float> getHomography(const vector<IntPoint2>& pts1,
         // y1'
         B[2*i] = pts2[i].x();
         B[2*i+1] = pts2[i].y();
-        }
+    }
 
     B = linSolve(A, B);
     Matrix<float> H(3, 3);
@@ -146,38 +145,55 @@ void panorama(const Image<Color,2>& I1, const Image<Color,2>& I2,
 
     // We run through the image and check if the pixels are within
     // if the values of the pixels of I2 are well placed then we add them to the image
-    // if not we apply the homography and we add I1 pixels
+    // if not we apply the homography (inverse) and we add I1 pixels to the image
+
+    Vector<float> points(3);
+
     for (int i = 0; i < I.width(); i++) {
         for (int j = 0; j < I.height(); j++) {
-            v[0]=i+x0;
-            v[1]=j+y0;
-            if(v[0]>0 && v[1]>0 && v[0]<I2.width() && v[1]<I2.height()){
-                I(i,j)=I2(v[0],v[1]);
-                //continue;
+            points[0] = i+x0;
+            points[1] = j+y0;
+            points[2] = 1;
+            if(points[0]>0 && points[1]>0 && points[0]<I2.width() && points[1]<I2.height()){
+                I(i,j) = I2(points[0],points[1]);
+                continue;
             }
-            v=inverse(H)*v;
-            v/=v[2];
-            if(v[0]>0 && v[1]>0 && v[0]<I1.width() && v[1]<I2.height()){
+            points = inverse(H) * points;
+            points /= points[2];
+            if(points[0]>0 && points[1]>0 && points[0]<I1.width() && points[1]<I2.height()){
                 if(I(i,j) == WHITE)
-                    I(i,j)=I1.interpolate(v[0],v[1]);
+                    I(i,j) = I1.interpolate(points[0],points[1]);
                 else
                 {
-                    auto p= I1.interpolate(v[0],v[1]);
+                    auto p = I1.interpolate(points[0],points[1]);
                     I(i,j) = Color((I(i,j)[0] + p[0]) / 2, (I(i,j)[1] + p[1]) / 2, (I(i,j)[2] + p[2]) / 2);
                 }
             }
         }
     }
-
     display(I,0,0);
 }
 
 // Main function
 int main(int argc, char* argv[]) {
-    //const char* s1 = argc>1? argv[1]: srcPath("image0006.jpg");
-    //const char* s2 = argc>2? argv[2]: srcPath("image0007.jpg");
-    const char* s1 = argc>1? argv[1]: srcPath("1.jpg");
-    const char* s2 = argc>2? argv[2]: srcPath("2.jpg");
+
+
+    const char* s1 = argc>1? argv[1]: srcPath("image0006.jpg");
+    const char* s2 = argc>2? argv[2]: srcPath("image0007.jpg");
+
+    //Here are some additional experiments with video game screenshots :
+
+    //const char* s1 = argc>1? argv[1]: srcPath("vergil1.jpg");
+    //const char* s2 = argc>2? argv[2]: srcPath("vergil2.jpg");
+    //const char* s1 = argc>1? argv[1]: srcPath("daysgone1.jpg");
+    //const char* s2 = argc>2? argv[2]: srcPath("daysgone2.jpg");
+    //const char* s1 = argc>1? argv[1]: srcPath("ittakestwo1.jpg");
+    //const char* s2 = argc>2? argv[2]: srcPath("ittakestwo2.jpg");
+
+    //as we can see in the result of this example, it even handles the rotation :
+
+    //const char* s1 = argc>1? argv[1]: srcPath("scarletnexus2.jpg");
+    //const char* s2 = argc>2? argv[2]: srcPath("scarletnexus1.jpg");
 
 
     // Load and display images
