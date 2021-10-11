@@ -21,25 +21,26 @@ void getClicks(Window w1, Window w2,
        int button = 0;
 
        int sub_window=0;
-       IntPoint2 dot;
+       IntPoint2 point;
        Window window;
 
 
-       int dot_radius = 10;
-       Color dot_col = Color(0,255,0);
-       button = anyGetMouse(dot, window, sub_window);
+       int point_Radius = 5;
+       Color point_Color = Color(0,0,255);
+       button = anyGetMouse(point, window, sub_window);
 
+        // button 3 is for right click
        while(button!=3){
 
            setActiveWindow(window);
-           drawCircle(dot, dot_radius, dot_col);
+           drawCircle(point, point_Radius, point_Color);
            if(window == w1){
-               pts1.push_back(dot);
+               pts1.push_back(point);
            }
            else if(window == w2){
-               pts2.push_back(dot);
+               pts2.push_back(point);
            };
-           button = anyGetMouse(dot, window, sub_window);
+           button = anyGetMouse(point, window, sub_window);
        }
        cout << "Processing..." << endl;
 
@@ -58,28 +59,33 @@ Matrix<float> getHomography(const vector<IntPoint2>& pts1,
 
 
     for(int i = 0; i<(int)n;i++){
-            // Fill the matrix A
-            A(2*i,0) = pts1[i].x();
-            A(2*i+1,0) = 0;
-            A(2*i,1) = pts1[i].y();
-            A(2*i+1,1) = 0;
-            A(2*i,2) = 1;
-            A(2*i+1,2) = 0;
-            A(2*i,3) = 0;
-            A(2*i+1,3) = pts1[i].x();
-            A(2*i,4) = 0;
-            A(2*i+1,4) = pts1[i].y();
-            A(2*i,5) = 0;
-            A(2*i+1,5) = 1;
-            A(2*i,6) = -(pts2[i].x()*pts1[i].x());
-            A(2*i+1,6) = -(pts2[i].y()*pts1[i].x());
-            A(2*i,7) = -(pts2[i].x()*pts1[i].y());
-            A(2*i+1,7) = -(pts2[i].y()*pts1[i].y());
+        // Fill A
+        // x1 y1 1 0 0 0 -x1'x1 -x1'y1
+        // 0 0 0 x1 y1 1 -y'1x1 -y1'y1
+
+        A(2*i,0) = pts1[i].x();
+        A(2*i+1,0) = 0;
+        A(2*i,1) = pts1[i].y();
+        A(2*i+1,1) = 0;
+        A(2*i,2) = 1;
+        A(2*i+1,2) = 0;
+        A(2*i,3) = 0;
+        A(2*i+1,3) = pts1[i].x();
+        A(2*i,4) = 0;
+        A(2*i+1,4) = pts1[i].y();
+        A(2*i,5) = 0;
+        A(2*i+1,5) = 1;
+        A(2*i,6) = -(pts2[i].x()*pts1[i].x());
+        A(2*i+1,6) = -(pts2[i].y()*pts1[i].x());
+        A(2*i,7) = -(pts2[i].x()*pts1[i].y());
+        A(2*i+1,7) = -(pts2[i].y()*pts1[i].y());
 
 
-            // Fill the Vector B
-            B[2*i] = pts2[i].x();
-            B[2*i+1] = pts2[i].y();
+        // Fill B
+        // x1'
+        // y1'
+        B[2*i] = pts2[i].x();
+        B[2*i+1] = pts2[i].y();
         }
 
     B = linSolve(A, B);
@@ -110,15 +116,6 @@ void growTo(float& x0, float& y0, float& x1, float& y1, float x, float y) {
     if(y>y1) y1=y;    
 }
 
-Color meanColor(const Color& j,const Color& k) {
-    /*if (j[0] + j[1] + j[2] < 20)
-        return k;
-    if (k[0] + k[1] + k[2] < 20)
-        return j;
-    */
-    return Color((j[0] + k[0]) / 2, (j[1] + k[1]) / 2, (j[2] + k[2]) / 2);
-
-}
 // Panorama construction
 void panorama(const Image<Color,2>& I1, const Image<Color,2>& I2,
               Matrix<float> H) {
@@ -147,30 +144,30 @@ void panorama(const Image<Color,2>& I1, const Image<Color,2>& I2,
     I.fill(WHITE);
     // ------------- TODO/A completer --------
 
-
+    // We run through the image and check if the pixels are within
+    // if the values of the pixels of I2 are well placed then we add them to the image
+    // if not we apply the homography and we add I1 pixels
     for (int i = 0; i < I.width(); i++) {
-            for (int j = 0; j < I.height(); j++) {
-                v[0]=i+x0;
-                v[1]=j+y0;
-                if(v[0]>0 && v[1]>0 && v[0]<I2.width() && v[1]<I2.height()){
-                    I(i,j)=I2(v[0],v[1]);
-                    continue;
-                    }
-                v=inverse(H)*v;
-                v/=v[2];
-                if(v[0]>0 && v[1]>0 && v[0]<I1.width() && v[1]<I2.height()){
-                    if(I(i,j)==WHITE)
-                        I(i,j)=I1.interpolate(v[0],v[1]);
-                    else
-                    {
-                        auto e= I1.interpolate(v[0],v[1]);
-                        I(i,j)= meanColor(I(i,j),e);
-                    }
-
+        for (int j = 0; j < I.height(); j++) {
+            v[0]=i+x0;
+            v[1]=j+y0;
+            if(v[0]>0 && v[1]>0 && v[0]<I2.width() && v[1]<I2.height()){
+                I(i,j)=I2(v[0],v[1]);
+                //continue;
+            }
+            v=inverse(H)*v;
+            v/=v[2];
+            if(v[0]>0 && v[1]>0 && v[0]<I1.width() && v[1]<I2.height()){
+                if(I(i,j) == WHITE)
+                    I(i,j)=I1.interpolate(v[0],v[1]);
+                else
+                {
+                    auto p= I1.interpolate(v[0],v[1]);
+                    I(i,j) = Color((I(i,j)[0] + p[0]) / 2, (I(i,j)[1] + p[1]) / 2, (I(i,j)[2] + p[2]) / 2);
                 }
-
             }
         }
+    }
 
     display(I,0,0);
 }
